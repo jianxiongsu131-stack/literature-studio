@@ -563,7 +563,7 @@ export default function Home() {
           <div className="map-intro">
             <span className="eyebrow">主题与文献关系图</span>
             <h1>从主题进入你的文献</h1>
-            <p>先选择主题，再点击文献查看 AI 摘要；需要做笔记时，再进入文献记录。所有节点都可以拖动调整位置。</p>
+            <p>单击主题查看关联文献，双击项目或主题打开资料卡；点击文献查看 AI 摘要。所有节点都可以拖动调整位置。</p>
           </div>
 
           <div className={`knowledge-map map-bg-${mapAppearance.background} ${selectedLiterature ? "drawer-open" : ""}`}>
@@ -575,11 +575,16 @@ export default function Home() {
             <button
               className={`project-node draggable-node ${draggingNode === activeProjectId ? "dragging" : ""}`}
               style={{ left: `${projectX}%`, top: `${projectY}%` }}
+              onClick={() => { clickWasDrag(activeProjectId); }}
+              onDoubleClick={() => {
+                if (clickWasDrag(activeProjectId) || !currentProject) return;
+                setEditTarget({ type: "project", item: currentProject });
+              }}
               onPointerDown={(event) => beginNodeDrag(event, "project", activeProjectId)}
               onPointerMove={moveNode}
               onPointerUp={endNodeDrag}
               onPointerCancel={endNodeDrag}
-              title="拖动项目节点"
+              title="双击打开项目资料卡 · 拖动调整位置"
             >
               <span>论文项目</span><strong>{currentProject?.shortName}</strong><small>{themes.length} 个主题 · {currentProjectLiterature.length} 篇文献</small>
               <em className="node-tags">{currentProject?.tags.slice(0, 2).map((tag) => <i key={tag}>#{tag}</i>)}</em>
@@ -591,11 +596,15 @@ export default function Home() {
                 className={`theme-node draggable-node ${theme.id === selectedThemeId ? "active" : ""} ${draggingNode === theme.id ? "dragging" : ""}`}
                 style={{ left: `${theme.x}%`, top: `${theme.y}%` }}
                 onClick={() => { if (clickWasDrag(theme.id)) return; setSelectedThemeId(theme.id); setSelectedLiteratureId(null); }}
+                onDoubleClick={() => {
+                  if (clickWasDrag(theme.id)) return;
+                  setEditTarget({ type: "theme", item: theme });
+                }}
                 onPointerDown={(event) => beginNodeDrag(event, "theme", theme.id)}
                 onPointerMove={moveNode}
                 onPointerUp={endNodeDrag}
                 onPointerCancel={endNodeDrag}
-                title={`${theme.name} · 拖动调整位置`}
+                title={`${theme.name} · 双击打开主题资料卡 · 拖动调整位置`}
               >
                 <span>{theme.name.slice(0, 1)}</span>
                 <div><strong>{theme.name}</strong><small>{literature.filter((item) => item.themeId === theme.id).length} 篇文献</small><em className="node-tags">{theme.tags.slice(0, 2).map((tag) => <i key={tag}>#{tag}</i>)}</em></div>
