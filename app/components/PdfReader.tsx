@@ -40,11 +40,12 @@ function safelyCleanupDocument(document: PDFDocumentProxy | null) {
   });
 }
 
-export default function PdfReader({ literatureId, title, records, onAiAssist, onSaveHighlight, onNotify }: {
+export default function PdfReader({ literatureId, title, records, onAiAssist, onTranslate, onSaveHighlight, onNotify }: {
   literatureId: string;
   title: string;
   records: PdfRecord[];
   onAiAssist: () => void;
+  onTranslate: () => void;
   onSaveHighlight: (draft: HighlightDraft) => void;
   onNotify: (message: string) => void;
 }) {
@@ -58,9 +59,12 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
   const [selectedText, setSelectedText] = useState("");
   const [selectedPage, setSelectedPage] = useState(1);
   const [outline, setOutline] = useState<PdfOutlineItem[]>([]);
-  const [sidePanel, setSidePanel] = useState<"outline" | "highlights">("outline");
+  const [sidePanel, setSidePanel] = useState<"outline" | "highlights" | "translation">("outline");
   const [kind, setKind] = useState<PdfRecordKind>("证据");
   const [thought, setThought] = useState("");
+  const [translationSource, setTranslationSource] = useState("");
+  const [translationText, setTranslationText] = useState("");
+  const [translationTarget, setTranslationTarget] = useState("简体中文");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentRef = useRef<PDFDocumentProxy | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -90,6 +94,9 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
 
   useEffect(() => {
     let active = true;
+    setSelectedText("");
+    setTranslationSource("");
+    setTranslationText("");
     getStoredPdf(literatureId)
       .then((stored) => {
         if (!active) return;
@@ -177,14 +184,32 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
     setStoredPdf(null);
     setPdfDocument(null);
     setSelectedText("");
+    setTranslationSource("");
+    setTranslationText("");
     onNotify("PDF 已从本地工作区移除，阅读记录仍然保留");
   }
 
   function captureSelection(text: string, page: number) {
-    setSelectedText(text.slice(0, 5000));
+    const source = text.slice(0, 5000);
+    setSelectedText(source);
     setSelectedPage(page);
     setThought("");
+    setTranslationSource(source);
+    setTranslationText("");
     setSidePanel("highlights");
+  }
+
+  function openTranslationPanel() {
+    if (selectedText.trim() && !translationSource.trim()) setTranslationSource(selectedText.trim());
+    setSidePanel("translation");
+  }
+
+  function requestTranslation() {
+    if (!translationSource.trim()) {
+      onNotify("请先在 PDF 中选择原文，或将原文粘贴到翻译区");
+      return;
+    }
+    onTranslate();
   }
 
   function saveHighlight() {
@@ -288,10 +313,22 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
           <div className="pdf-side-tabs">
             <button className={sidePanel === "outline" ? "active" : ""} onClick={() => setSidePanel("outline")}>目录</button>
             <button className={sidePanel === "highlights" ? "active" : ""} onClick={() => setSidePanel("highlights")}>划线记录</button>
+            <button className={sidePanel === "translation" ? "active" : ""} onClick={openTranslationPanel}>翻译</button>
           </div>
           {sidePanel === "outline" ? <div className="pdf-outline-panel">
             <div className="highlight-title"><span>文献目录</span><small>{outline.length ? "点击跳转" : "未检测到目录"}</small></div>
             {outline.length ? <PdfOutline items={outline} onOpen={(item) => void openOutlineItem(item)} /> : <div className="empty-outline"><i>目</i><strong>这份 PDF 没有内置目录</strong><p>仍然可以通过连续滚动阅读全部页面。</p></div>}
+          </div> : sidePanel === "translation" ? <div className="translation-panel">
+            <div className="highlight-title"><span>查看翻译</span><small>{translationSource ? `原文 p. ${selectedPage}` : "等待选择原文"}</small></div>
+            <div className="translation-guide"><i>译</i><p>选中 PDF 中的文字后切换到这里，原文会自动带入。</p></div>
+            <label>原文<textarea value={translationSource} onChange={(event) => { setTranslationSource(event.target.value); setTranslationText(""); }} placeholder="在 PDF 中选择文字，或在这里粘贴需要翻译的原文……" /></label>
+            <div className="translation-language-row">
+              <label>翻译为<select value={translationTarget} onChange={(event) => setTranslationTarget(event.target.value)}><option>简体中文</option><option>繁體中文</option><option>English</option><option>日本語</option><option>한국어</option></select></label>
+              <button onClick={requestTranslation} disabled={!translationSource.trim()}>AI 翻译</button>
+            </div>
+            <label>译文<textarea className="translation-result" value={translationText} onChange={(event) => setTranslationText(event.target.value)} placeholder={`翻译为${translationTarget}的内容会显示在这里，也可以粘贴或校订译文。`} /></label>
+            <div className="translation-note"><span>AI</span><p>翻译按钮使用设置中的统一 AI 入口；尚未连接时会带你前往设置。</p></div>
+            {(translationSource || translationText) && <button className="clear-translation" onClick={() => { setTranslationSource(""); setTranslationText(""); }}>清空当前翻译</button>}
           </div> : <>
           <div className="highlight-title"><span>划线记录</span><small>第 {currentPage} 页 · {pageRecords.length} 条</small></div>
           {selectedText ? (

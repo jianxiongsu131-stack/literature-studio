@@ -1117,7 +1117,7 @@ function StudyView({ literature, records, allRecords, counts, activeKind, showRe
       <div className="study-divider" role="separator" aria-label="调整记录区与文献区宽度" aria-orientation="vertical" aria-valuenow={recordPaneWidth} tabIndex={0} onPointerDown={beginResize} onPointerMove={resizePanes} onPointerUp={endResize} onPointerCancel={endResize} onKeyDown={resizeWithKeyboard}><i /></div>
 
       <section className="study-document-pane" aria-label="PDF 文献阅读区">
-        <PdfReader literatureId={literature.id} title={literature.title} records={allRecords} onAiAssist={() => onAiAssist("解读选中的原文")} onSaveHighlight={onSaveHighlight} onNotify={onNotify} />
+        <PdfReader literatureId={literature.id} title={literature.title} records={allRecords} onAiAssist={() => onAiAssist("解读选中的原文")} onTranslate={() => onAiAssist("翻译选中的文献原文")} onSaveHighlight={onSaveHighlight} onNotify={onNotify} />
       </section>
     </section>
   );

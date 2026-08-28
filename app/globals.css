@@ -491,7 +491,7 @@ button { cursor: pointer; }
 .textLayer .endOfContent { display: block; position: absolute; inset: 100% 0 0; z-index: 0; cursor: default; user-select: none; }
 
 .highlight-workbench { min-width: 0; overflow-y: auto; border-left: 1px solid var(--line); background: var(--paper); padding: 18px 16px 35px; }
-.pdf-side-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 14px; padding: 3px; border-radius: 9px; background: #eee6dc; }
+.pdf-side-tabs { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; margin-bottom: 14px; padding: 3px; border-radius: 9px; background: #eee6dc; }
 .pdf-side-tabs button { height: 29px; border: 0; border-radius: 7px; background: transparent; color: #866b55; font-size: 8px; }
 .pdf-side-tabs button.active { background: #fff; color: var(--coffee); box-shadow: 0 3px 9px rgba(69,30,2,.08); font-weight: 800; }
 .pdf-outline-panel { min-height: 0; }
@@ -507,6 +507,23 @@ button { cursor: pointer; }
 .empty-outline i { width: 50px; height: 50px; border-radius: 15px; background: var(--apricot); color: var(--coffee); display: grid; place-items: center; font: normal 800 16px Georgia,"Songti SC",serif; }
 .empty-outline strong { margin-top: 13px; color: var(--coffee); font: 800 12px Georgia,"Songti SC",serif; }
 .empty-outline p { max-width: 190px; margin: 6px 0 0; font-size: 8px; line-height: 1.6; }
+.translation-panel { min-height: 0; }
+.translation-guide { margin: 13px 0; border-radius: 10px; background: var(--apricot); padding: 10px; display: flex; align-items: center; gap: 9px; }
+.translation-guide i { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px; background: var(--ginger); color: var(--coffee); display: grid; place-items: center; font: normal 800 11px Georgia,"Songti SC",serif; }
+.translation-guide p { margin: 0; color: #76553c; font-size: 7.5px; line-height: 1.6; }
+.translation-panel > label, .translation-language-row label { display: block; color: #76563e; font-size: 8px; font-weight: 800; }
+.translation-panel textarea, .translation-panel select { display: block; width: 100%; margin-top: 6px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--coffee); padding: 9px; outline: 0; font-size: 9px; }
+.translation-panel textarea { min-height: 105px; resize: vertical; line-height: 1.65; }
+.translation-panel textarea.translation-result { min-height: 155px; }
+.translation-panel textarea:focus, .translation-panel select:focus { border-color: #bf8422; box-shadow: 0 0 0 3px rgba(234,184,75,.18); }
+.translation-language-row { margin: 11px 0; display: grid; grid-template-columns: 1fr 92px; align-items: end; gap: 8px; }
+.translation-language-row button { height: 34px; border: 1px solid #d5a94d; border-radius: 8px; background: #fff4d8; color: #6b451b; font-size: 8px; font-weight: 800; }
+.translation-language-row button:hover:not(:disabled) { background: var(--ginger); }
+.translation-language-row button:disabled { cursor: default; opacity: .45; }
+.translation-note { margin-top: 11px; border-top: 1px solid var(--line); padding-top: 11px; display: flex; align-items: flex-start; gap: 7px; }
+.translation-note span { flex: 0 0 auto; border-radius: 5px; background: var(--coffee); color: #fff4d8; padding: 3px 5px; font-size: 6px; font-weight: 800; }
+.translation-note p { margin: 0; color: var(--muted); font-size: 7px; line-height: 1.55; }
+.clear-translation { width: 100%; height: 28px; margin-top: 7px; border: 0; background: transparent; color: var(--muted); font-size: 7.5px; }
 .highlight-title { display: flex; justify-content: space-between; align-items: center; padding-bottom: 13px; border-bottom: 1px solid var(--line); }
 .highlight-title span { color: var(--coffee); font: 800 14px Georgia,"Songti SC",serif; }
 .highlight-title small { color: var(--muted); font-size: 7.5px; }
