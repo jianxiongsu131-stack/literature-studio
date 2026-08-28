@@ -591,41 +591,51 @@ export default function Home() {
             </button>
 
             {themes.map((theme) => (
-              <button
+              <div
                 key={theme.id}
-                className={`theme-node draggable-node ${theme.id === selectedThemeId ? "active" : ""} ${draggingNode === theme.id ? "dragging" : ""}`}
+                className={`map-node-frame theme-node-frame ${theme.id === selectedThemeId ? "active" : ""} ${draggingNode === theme.id ? "dragging" : ""}`}
                 style={{ left: `${theme.x}%`, top: `${theme.y}%` }}
-                onClick={() => { if (clickWasDrag(theme.id)) return; setSelectedThemeId(theme.id); setSelectedLiteratureId(null); }}
-                onDoubleClick={() => {
-                  if (clickWasDrag(theme.id)) return;
-                  setEditTarget({ type: "theme", item: theme });
-                }}
-                onPointerDown={(event) => beginNodeDrag(event, "theme", theme.id)}
-                onPointerMove={moveNode}
-                onPointerUp={endNodeDrag}
-                onPointerCancel={endNodeDrag}
-                title={`${theme.name} · 双击打开主题资料卡 · 拖动调整位置`}
               >
-                <span>{theme.name.slice(0, 1)}</span>
-                <div><strong>{theme.name}</strong><small>{literature.filter((item) => item.themeId === theme.id).length} 篇文献</small><em className="node-tags">{theme.tags.slice(0, 2).map((tag) => <i key={tag}>#{tag}</i>)}</em></div>
-              </button>
+                <button
+                  className={`theme-node draggable-node ${theme.id === selectedThemeId ? "active" : ""} ${draggingNode === theme.id ? "dragging" : ""}`}
+                  onClick={() => { if (clickWasDrag(theme.id)) return; setSelectedThemeId(theme.id); setSelectedLiteratureId(null); }}
+                  onDoubleClick={() => {
+                    if (clickWasDrag(theme.id)) return;
+                    setEditTarget({ type: "theme", item: theme });
+                  }}
+                  onPointerDown={(event) => beginNodeDrag(event, "theme", theme.id)}
+                  onPointerMove={moveNode}
+                  onPointerUp={endNodeDrag}
+                  onPointerCancel={endNodeDrag}
+                  title={`${theme.name} · 双击打开主题资料卡 · 拖动调整位置`}
+                >
+                  <span>{theme.name.slice(0, 1)}</span>
+                  <div><strong>{theme.name}</strong><small>{literature.filter((item) => item.themeId === theme.id).length} 篇文献</small><em className="node-tags">{theme.tags.slice(0, 2).map((tag) => <i key={tag}>#{tag}</i>)}</em></div>
+                </button>
+                <button className="map-node-delete" onClick={() => deleteTheme(theme)} aria-label={`删除主题 ${theme.name}`} title="删除主题">×</button>
+              </div>
             ))}
 
             {themeLiterature.map((item) => (
-              <button
+              <div
                 key={item.id}
-                className={`literature-node draggable-node ${item.id === selectedLiteratureId ? "active" : ""} ${draggingNode === item.id ? "dragging" : ""}`}
+                className={`map-node-frame literature-node-frame ${item.id === selectedLiteratureId ? "active" : ""} ${draggingNode === item.id ? "dragging" : ""}`}
                 style={{ left: `${item.x}%`, top: `${item.y}%` }}
-                onClick={() => { if (clickWasDrag(item.id)) return; openLiterature(item); }}
-                onPointerDown={(event) => beginNodeDrag(event, "literature", item.id)}
-                onPointerMove={moveNode}
-                onPointerUp={endNodeDrag}
-                onPointerCancel={endNodeDrag}
-                title={`${item.title} · 拖动调整位置`}
               >
-                <span>{item.author.slice(0, 1)}</span>
-                <div><strong>{item.author}</strong><small>{item.year} · {item.status}</small><em className="node-tags">{item.tags.slice(0, 2).map((tag) => <i key={tag}>#{tag}</i>)}</em></div>
-              </button>
+                <button
+                  className={`literature-node draggable-node ${item.id === selectedLiteratureId ? "active" : ""} ${draggingNode === item.id ? "dragging" : ""}`}
+                  onClick={() => { if (clickWasDrag(item.id)) return; openLiterature(item); }}
+                  onPointerDown={(event) => beginNodeDrag(event, "literature", item.id)}
+                  onPointerMove={moveNode}
+                  onPointerUp={endNodeDrag}
+                  onPointerCancel={endNodeDrag}
+                  title={`${item.title} · 拖动调整位置`}
+                >
+                  <span>{item.author.slice(0, 1)}</span>
+                  <div><strong>{item.author}</strong><small>{item.year} · {item.status}</small><em className="node-tags">{item.tags.slice(0, 2).map((tag) => <i key={tag}>#{tag}</i>)}</em></div>
+                </button>
+                <button className="map-node-delete" onClick={() => deleteLiterature(item)} aria-label={`删除文献 ${item.title}`} title="删除文献">×</button>
+              </div>
             ))}
 
             <div className="map-legend">

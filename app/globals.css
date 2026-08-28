@@ -209,11 +209,16 @@ button { cursor: pointer; }
 .map-bg-dark.map-line-ginger .map-lines .literature-line { stroke: var(--ginger); }
 .map-bg-dark.map-line-sage .map-lines line { stroke: rgba(143,180,148,.7); }
 .map-bg-dark.map-line-sage .map-lines .literature-line { stroke: #93ba98; }
-.project-node, .theme-node, .literature-node { position: absolute; transform: translate(-50%, -50%); z-index: 2; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
-.project-node:hover, .theme-node:hover, .literature-node:hover { transform: translate(-50%, -50%) scale(1.035); }
+.project-node, .map-node-frame { position: absolute; transform: translate(-50%, -50%); z-index: 2; transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.project-node:hover, .map-node-frame:hover { transform: translate(-50%, -50%) scale(1.035); }
+.map-node-frame > .theme-node, .map-node-frame > .literature-node { position: relative; transform: none; }
 .draggable-node { cursor: grab; touch-action: none; user-select: none; }
 .draggable-node.dragging { z-index: 8; cursor: grabbing; transition: box-shadow .18s ease, border-color .18s ease; box-shadow: 0 18px 42px rgba(69,30,2,.24); }
-.draggable-node.dragging:hover { transform: translate(-50%, -50%); }
+.project-node.draggable-node.dragging:hover, .map-node-frame.dragging:hover { transform: translate(-50%, -50%); }
+.map-node-frame.dragging { z-index: 8; }
+.map-node-delete { position: absolute; z-index: 10; top: -9px; right: -9px; width: 24px; height: 24px; border: 1px solid rgba(112,49,17,.24); border-radius: 50%; background: #fffaf0; color: #8e321f; box-shadow: 0 5px 14px rgba(69,30,2,.14); font: 700 15px/1 system-ui,sans-serif; opacity: 0; pointer-events: none; transform: scale(.82); transition: opacity .16s ease, transform .16s ease, background .16s ease; }
+.map-node-delete:hover { background: #8e321f; color: #fff; }
+.map-node-frame:hover .map-node-delete, .map-node-frame:focus-within .map-node-delete, .map-node-frame.active .map-node-delete { opacity: 1; pointer-events: auto; transform: scale(1); }
 .project-node { width: 142px; height: 142px; border-radius: 50%; border: 1px solid var(--coffee); background: var(--coffee); color: #fff8e9; box-shadow: 0 18px 40px rgba(69,30,2,.2); }
 .project-node span, .project-node strong, .project-node small { display: block; }
 .project-node span { font-size: 9px; letter-spacing: .15em; opacity: .7; }
