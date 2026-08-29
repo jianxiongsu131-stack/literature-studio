@@ -21,7 +21,9 @@ export const literatureAnalysisInstruction = `
 2. 对每个实际存在的部分分别回答“该部分说了什么”和“有什么好的地方值得借鉴”。
 3. 所有结论必须能在原文中找到依据，并返回对应页码和置信度。
 4. 原文缺失的部分不要补写；无法判断时标记为 other 或低置信度。
-5. 只返回符合 AnalysisResult 结构的 JSON，不输出额外说明。
+5. 只返回 JSON，不输出额外说明。格式必须是：
+{"purpose":"全文研究目的与核心价值","sections":[{"id":"introduction","type":"introduction","label":"引言","summary":"该部分说了什么","learnablePoints":["值得借鉴之处"],"pages":["p. 1–3"],"confidence":"high"}]}
+type 只能是 introduction、theory、experiment、results、discussion、conclusion、other；confidence 只能是 high、medium、low。
 `;
 
 const baseSections: AnalysisSection[] = [
@@ -49,4 +51,33 @@ export function createMockAnalysis(literatureId: string, generatedAt = "2026-08-
     generatedAt,
     source: "mock",
   };
+}
+
+const validTypes = new Set<AnalysisSection["type"]>(["introduction", "theory", "experiment", "results", "discussion", "conclusion", "other"]);
+const validConfidence = new Set<AnalysisSection["confidence"]>(["high", "medium", "low"]);
+
+export function parseAnalysisResult(raw: string): AnalysisResult {
+  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  let value: Partial<AnalysisResult>;
+  try {
+    value = JSON.parse(cleaned) as Partial<AnalysisResult>;
+  } catch {
+    throw new Error("AI 返回的摘要不是有效结构，请重新分析");
+  }
+  if (!value.purpose || !Array.isArray(value.sections) || !value.sections.length) throw new Error("AI 返回的摘要结构不完整，请重试");
+  const sections = value.sections.map((section, index) => {
+    const item = section as Partial<AnalysisSection>;
+    if (!item.summary) throw new Error("AI 返回的章节摘要不完整，请重试");
+    const type = item.type && validTypes.has(item.type) ? item.type : "other";
+    return {
+      id: `${String(item.id || type)}-${index}`,
+      type,
+      label: String(item.label || "其他"),
+      summary: String(item.summary),
+      learnablePoints: Array.isArray(item.learnablePoints) ? item.learnablePoints.map(String).filter(Boolean) : [],
+      pages: Array.isArray(item.pages) ? item.pages.map(String).filter(Boolean) : [],
+      confidence: item.confidence && validConfidence.has(item.confidence) ? item.confidence : "low",
+    } satisfies AnalysisSection;
+  });
+  return { purpose: String(value.purpose), sections, generatedAt: new Date().toISOString(), source: "api" };
 }

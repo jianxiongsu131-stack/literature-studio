@@ -45,7 +45,7 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
   title: string;
   records: PdfRecord[];
   onAiAssist: () => void;
-  onTranslate: () => void;
+  onTranslate: (source: string, target: string) => Promise<string>;
   onSaveHighlight: (draft: HighlightDraft) => void;
   onNotify: (message: string) => void;
 }) {
@@ -65,6 +65,8 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
   const [translationSource, setTranslationSource] = useState("");
   const [translationText, setTranslationText] = useState("");
   const [translationTarget, setTranslationTarget] = useState("简体中文");
+  const [translating, setTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const documentRef = useRef<PDFDocumentProxy | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -94,12 +96,13 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
 
   useEffect(() => {
     let active = true;
-    setSelectedText("");
-    setTranslationSource("");
-    setTranslationText("");
     getStoredPdf(literatureId)
       .then((stored) => {
         if (!active) return;
+        setSelectedText("");
+        setTranslationSource("");
+        setTranslationText("");
+        setTranslationError("");
         if (stored) return openPdf(stored);
         setStoredPdf(null);
         setPdfDocument(null);
@@ -196,6 +199,7 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
     setThought("");
     setTranslationSource(source);
     setTranslationText("");
+    setTranslationError("");
     setSidePanel("highlights");
   }
 
@@ -204,12 +208,24 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
     setSidePanel("translation");
   }
 
-  function requestTranslation() {
+  async function requestTranslation() {
     if (!translationSource.trim()) {
       onNotify("请先在 PDF 中选择原文，或将原文粘贴到翻译区");
       return;
     }
-    onTranslate();
+    setTranslating(true);
+    setTranslationError("");
+    try {
+      const result = await onTranslate(translationSource.trim(), translationTarget);
+      setTranslationText(result);
+      onNotify("Gemini 翻译已完成");
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "翻译失败，请重试";
+      setTranslationError(message);
+      onNotify(message);
+    } finally {
+      setTranslating(false);
+    }
   }
 
   function saveHighlight() {
@@ -321,14 +337,15 @@ export default function PdfReader({ literatureId, title, records, onAiAssist, on
           </div> : sidePanel === "translation" ? <div className="translation-panel">
             <div className="highlight-title"><span>查看翻译</span><small>{translationSource ? `原文 p. ${selectedPage}` : "等待选择原文"}</small></div>
             <div className="translation-guide"><i>译</i><p>选中 PDF 中的文字后切换到这里，原文会自动带入。</p></div>
-            <label>原文<textarea value={translationSource} onChange={(event) => { setTranslationSource(event.target.value); setTranslationText(""); }} placeholder="在 PDF 中选择文字，或在这里粘贴需要翻译的原文……" /></label>
+            <label>原文<textarea value={translationSource} onChange={(event) => { setTranslationSource(event.target.value); setTranslationText(""); setTranslationError(""); }} placeholder="在 PDF 中选择文字，或在这里粘贴需要翻译的原文……" /></label>
             <div className="translation-language-row">
               <label>翻译为<select value={translationTarget} onChange={(event) => setTranslationTarget(event.target.value)}><option>简体中文</option><option>繁體中文</option><option>English</option><option>日本語</option><option>한국어</option></select></label>
-              <button onClick={requestTranslation} disabled={!translationSource.trim()}>AI 翻译</button>
+              <button onClick={() => void requestTranslation()} disabled={!translationSource.trim() || translating}>{translating ? "翻译中…" : "AI 翻译"}</button>
             </div>
+            {translationError && <div className="translation-error">{translationError}</div>}
             <label>译文<textarea className="translation-result" value={translationText} onChange={(event) => setTranslationText(event.target.value)} placeholder={`翻译为${translationTarget}的内容会显示在这里，也可以粘贴或校订译文。`} /></label>
             <div className="translation-note"><span>AI</span><p>翻译按钮使用设置中的统一 AI 入口；尚未连接时会带你前往设置。</p></div>
-            {(translationSource || translationText) && <button className="clear-translation" onClick={() => { setTranslationSource(""); setTranslationText(""); }}>清空当前翻译</button>}
+            {(translationSource || translationText) && <button className="clear-translation" onClick={() => { setTranslationSource(""); setTranslationText(""); setTranslationError(""); }}>清空当前翻译</button>}
           </div> : <>
           <div className="highlight-title"><span>划线记录</span><small>第 {currentPage} 页 · {pageRecords.length} 条</small></div>
           {selectedText ? (

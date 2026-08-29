@@ -8,6 +8,8 @@ import { AiConnectionSettings, aiConnectionName, aiConnectionReady, defaultAiCon
 import { CloudServicesSettings, cloudModeName, defaultCloudServicesSettings } from "./lib/cloud-services";
 import { deleteStoredPdf, saveStoredPdf } from "./lib/pdf-storage";
 import { loadWorkspaceValue, saveWorkspaceValue } from "./lib/workspace-storage";
+import { analyzeLiteratureWithAi, translateWithAi, verifyAiConnection } from "./lib/ai-client";
+import { extractStoredPdfText } from "./lib/pdf-text";
 
 type ReadingStatus = "粗读" | "精读" | "已完成";
 type RecordKind = "理论" | "概念" | "方法" | "证据" | "局限" | "我的思考";
@@ -137,6 +139,7 @@ export default function Home() {
   const [activeSectionId, setActiveSectionId] = useState("introduction");
   const [activeKind, setActiveKind] = useState<RecordKind>("理论");
   const [analysis, setAnalysis] = useState<AnalysisResult>(() => createMockAnalysis("liu-2024"));
+  const [analysesByLiterature, setAnalysesByLiterature] = useState<Record<string, AnalysisResult>>({});
   const [analyzing, setAnalyzing] = useState(false);
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [editTarget, setEditTarget] = useState<NodeEditTarget | null>(null);
@@ -144,6 +147,7 @@ export default function Home() {
   const [aiSettings, setAiSettings] = useState<AiConnectionSettings>(defaultAiConnectionSettings);
   const [cloudSettings, setCloudSettings] = useState<CloudServicesSettings>(defaultCloudServicesSettings);
   const [hasSessionCredential, setHasSessionCredential] = useState(false);
+  const [aiVerified, setAiVerified] = useState(false);
   const [draggingNode, setDraggingNode] = useState("");
   const [toast, setToast] = useState("");
   const [hydrated, setHydrated] = useState(false);
@@ -162,7 +166,8 @@ export default function Home() {
       loadWorkspaceValue<MapAppearance>("yanji-map-appearance", defaultMapAppearance),
       loadWorkspaceValue<AiConnectionSettings>("yanji-ai-settings", defaultAiConnectionSettings),
       loadWorkspaceValue<CloudServicesSettings>("yanji-cloud-settings", defaultCloudServicesSettings),
-    ]).then(([savedProjects, savedThemes, savedLiterature, savedRecords, savedAppearance, savedAiSettings, savedCloudSettings]) => {
+      loadWorkspaceValue<Record<string, AnalysisResult>>("yanji-ai-analyses", {}),
+    ]).then(([savedProjects, savedThemes, savedLiterature, savedRecords, savedAppearance, savedAiSettings, savedCloudSettings, savedAnalyses]) => {
       if (cancelled) return;
       setProjects(savedProjects.map((project) => ({ ...project, tags: project.tags ?? [] })));
       const migratedThemes = savedThemes.map((theme) => ({ ...theme, tags: theme.tags ?? [], projectId: "projectId" in theme ? theme.projectId : mainProjectId }));
@@ -173,6 +178,7 @@ export default function Home() {
       setMapAppearance(savedAppearance);
       setAiSettings(savedAiSettings);
       setCloudSettings(savedCloudSettings);
+      setAnalysesByLiterature(savedAnalyses);
       setHydrated(true);
     });
     return () => { cancelled = true; };
@@ -188,8 +194,9 @@ export default function Home() {
       saveWorkspaceValue("yanji-map-appearance", mapAppearance),
       saveWorkspaceValue("yanji-ai-settings", aiSettings),
       saveWorkspaceValue("yanji-cloud-settings", cloudSettings),
+      saveWorkspaceValue("yanji-ai-analyses", analysesByLiterature),
     ]).catch(() => undefined);
-  }, [projects, allThemes, literature, records, mapAppearance, aiSettings, cloudSettings, hydrated]);
+  }, [projects, allThemes, literature, records, mapAppearance, aiSettings, cloudSettings, analysesByLiterature, hydrated]);
 
   const currentProject = projects.find((project) => project.id === activeProjectId) ?? projects[0];
   const projectX = currentProject?.x ?? 50;
@@ -203,7 +210,8 @@ export default function Home() {
   const currentRecords = records.filter((item) => item.literatureId === selectedLiteratureId);
   const visibleRecords = currentRecords.filter((item) => item.kind === activeKind);
   const activeSection = analysis.sections.find((section) => section.id === activeSectionId) ?? analysis.sections[0];
-  const aiReady = aiConnectionReady(aiSettings, hasSessionCredential);
+  const aiConfigured = aiConnectionReady(aiSettings, hasSessionCredential);
+  const aiReady = aiConfigured && aiVerified;
 
   const counts = useMemo(() => {
     return recordKinds.reduce<Record<RecordKind, number>>((result, item) => {
@@ -224,10 +232,24 @@ export default function Home() {
   }
 
   function saveAiConnection(settings: AiConnectionSettings, credential: string) {
+    const settingsChanged = JSON.stringify(settings) !== JSON.stringify(aiSettings);
+    const credentialChanged = Boolean(credential && credential !== aiCredentialRef.current);
     if (credential) aiCredentialRef.current = credential;
     setHasSessionCredential(Boolean(aiCredentialRef.current));
     setAiSettings(settings);
-    notify(settings.mode === "unconfigured" ? "已保持为不连接 AI" : `${aiConnectionName(settings)}已保存`);
+    if (settingsChanged || credentialChanged || settings.mode === "unconfigured") setAiVerified(false);
+    notify(settings.mode === "unconfigured" ? "已保持为不连接 AI" : `${aiConnectionName(settings)}已保存，请测试连接`);
+  }
+
+  async function testAiConnection(settings: AiConnectionSettings, credential: string) {
+    const activeCredential = credential || aiCredentialRef.current;
+    if (!settings.endpoint || !settings.model || !activeCredential) throw new Error("请完整填写模型、地址和 API 密钥");
+    await verifyAiConnection(settings, activeCredential);
+    aiCredentialRef.current = activeCredential;
+    setHasSessionCredential(true);
+    setAiSettings(settings);
+    setAiVerified(true);
+    notify("Gemini 连接测试成功");
   }
 
   function saveCloudConnection(settings: CloudServicesSettings) {
@@ -240,7 +262,7 @@ export default function Home() {
       openAiSettings();
       return;
     }
-    notify(`${action}已接入 ${aiConnectionName(aiSettings)} 的统一入口`);
+    notify(`${action}尚未开放真实处理；当前已验证 ${aiConnectionName(aiSettings)}`);
   }
 
   function beginNodeDrag(event: ReactPointerEvent<HTMLElement>, type: "project" | "theme" | "literature", id: string) {
@@ -383,6 +405,11 @@ export default function Home() {
     if (!window.confirm(`删除文献“${item.title}”？\n\n它的阅读记录和本地 PDF 也会被删除。此操作无法撤销。`)) return;
     setLiterature((items) => items.filter((literatureItem) => literatureItem.id !== item.id));
     setRecords((items) => items.filter((record) => record.literatureId !== item.id));
+    setAnalysesByLiterature((items) => {
+      const next = { ...items };
+      delete next[item.id];
+      return next;
+    });
     void deleteStoredPdf(item.id).catch(() => undefined);
     setSelectedLiteratureId(null);
     notify("文献已删除");
@@ -391,7 +418,7 @@ export default function Home() {
   function openLiterature(item: Literature) {
     setSelectedThemeId(item.themeId);
     setSelectedLiteratureId(item.id);
-    const nextAnalysis = createMockAnalysis(item.id);
+    const nextAnalysis = analysesByLiterature[item.id] ?? createMockAnalysis(item.id);
     setAnalysis(nextAnalysis);
     setActiveSectionId(nextAnalysis.sections[0].id);
   }
@@ -408,15 +435,35 @@ export default function Home() {
     setMode("study");
   }
 
-  function reanalyze() {
+  async function reanalyze() {
     if (!selectedLiterature || analyzing) return;
+    if (!aiReady) {
+      openAiSettings();
+      notify(aiConfigured ? "请先测试 AI 连接" : "请先完成 AI 连接设置");
+      return;
+    }
     setAnalyzing(true);
-    notify(aiReady ? `正在通过 ${aiConnectionName(aiSettings)} 分析文献` : "当前继续使用原型摘要；可在设置中连接真实 AI");
-    window.setTimeout(() => {
-      setAnalysis(createMockAnalysis(selectedLiterature.id, new Date().toISOString()));
+    notify(`正在读取 PDF 并通过 ${aiConnectionName(aiSettings)} 分析`);
+    try {
+      const sourceText = await extractStoredPdfText(selectedLiterature.id);
+      const nextAnalysis = await analyzeLiteratureWithAi(aiSettings, aiCredentialRef.current, selectedLiterature.title, sourceText);
+      setAnalysis(nextAnalysis);
+      setAnalysesByLiterature((items) => ({ ...items, [selectedLiterature.id]: nextAnalysis }));
+      setActiveSectionId(nextAnalysis.sections[0].id);
+      notify("真实 AI 摘要已生成");
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : "文献分析失败，请重试");
+    } finally {
       setAnalyzing(false);
-      notify("AI 摘要已重新生成");
-    }, 1100);
+    }
+  }
+
+  async function translateSelection(source: string, target: string) {
+    if (!aiReady) {
+      openAiSettings();
+      throw new Error(aiConfigured ? "请先测试 AI 连接" : "请先完成 AI 连接设置");
+    }
+    return translateWithAi(aiSettings, aiCredentialRef.current, source, target);
   }
 
   function updateStatus(status: ReadingStatus) {
@@ -555,7 +602,7 @@ export default function Home() {
           onSectionChange={setHomeSection}
           onEditProject={(project) => setEditTarget({ type: "project", item: project })}
           onDeleteProject={deleteProject}
-          settings={<SettingsCenter appearance={mapAppearance} aiSettings={aiSettings} cloudSettings={cloudSettings} hasSessionCredential={hasSessionCredential} onAppearanceChange={setMapAppearance} onSaveAi={saveAiConnection} onSaveCloud={saveCloudConnection} onNotify={notify} />}
+          settings={<SettingsCenter appearance={mapAppearance} aiSettings={aiSettings} cloudSettings={cloudSettings} hasSessionCredential={hasSessionCredential} aiVerified={aiVerified} onAppearanceChange={setMapAppearance} onSaveAi={saveAiConnection} onTestAi={testAiConnection} onSaveCloud={saveCloudConnection} onNotify={notify} />}
           account={<AccountCenter onNotify={notify} />}
         />
       ) : mode === "map" && projectView === "map" ? (
@@ -690,6 +737,7 @@ export default function Home() {
           onCloseRecordForm={() => setShowRecordForm(false)}
           onSaveRecord={saveRecord}
           onAiAssist={useAiEntry}
+          onTranslate={translateSelection}
           onSaveHighlight={savePdfHighlight}
           onNotify={notify}
         />
@@ -1023,7 +1071,7 @@ function SummaryDrawer({ literature, analysis, activeSection, activeSectionId, a
   );
 }
 
-function StudyView({ literature, records, allRecords, counts, activeKind, showRecordForm, onKindChange, onBack, onAdd, onCloseRecordForm, onSaveRecord, onAiAssist, onSaveHighlight, onNotify }: {
+function StudyView({ literature, records, allRecords, counts, activeKind, showRecordForm, onKindChange, onBack, onAdd, onCloseRecordForm, onSaveRecord, onAiAssist, onTranslate, onSaveHighlight, onNotify }: {
   literature: Literature;
   records: ResearchRecord[];
   allRecords: ResearchRecord[];
@@ -1036,6 +1084,7 @@ function StudyView({ literature, records, allRecords, counts, activeKind, showRe
   onCloseRecordForm: () => void;
   onSaveRecord: (event: FormEvent<HTMLFormElement>) => void;
   onAiAssist: (action: string) => void;
+  onTranslate: (source: string, target: string) => Promise<string>;
   onSaveHighlight: (draft: { quote: string; page: string; kind: RecordKind; thought: string }) => void;
   onNotify: (message: string) => void;
 }) {
@@ -1117,7 +1166,7 @@ function StudyView({ literature, records, allRecords, counts, activeKind, showRe
       <div className="study-divider" role="separator" aria-label="调整记录区与文献区宽度" aria-orientation="vertical" aria-valuenow={recordPaneWidth} tabIndex={0} onPointerDown={beginResize} onPointerMove={resizePanes} onPointerUp={endResize} onPointerCancel={endResize} onKeyDown={resizeWithKeyboard}><i /></div>
 
       <section className="study-document-pane" aria-label="PDF 文献阅读区">
-        <PdfReader literatureId={literature.id} title={literature.title} records={allRecords} onAiAssist={() => onAiAssist("解读选中的原文")} onTranslate={() => onAiAssist("翻译选中的文献原文")} onSaveHighlight={onSaveHighlight} onNotify={onNotify} />
+        <PdfReader literatureId={literature.id} title={literature.title} records={allRecords} onAiAssist={() => onAiAssist("解读选中的原文")} onTranslate={onTranslate} onSaveHighlight={onSaveHighlight} onNotify={onNotify} />
       </section>
     </section>
   );
